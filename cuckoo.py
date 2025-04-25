@@ -1,10 +1,10 @@
 # archivo: cuckoo_main.py
+import os
 import time
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from scipy.special import gamma
-from tsp_utils import fitness, graficar_ruta_grafo_espacial, graficar_comparaciones
+from tsp_utils import fitness, graficar_ruta_grafo_espacial
 from matrices import matrices
 
 # Función Levy Flight para generar nuevos candidatos
@@ -42,39 +42,77 @@ def cuckoo_search_tsp(matriz_distancia, n_nests=25, max_iter=100, pa=0.25, alpha
 
     return best_nest, best_fitness
 
+# Hiperparámetros para experimentar
+n_nests_values = [10, 25, 50]
+max_iter_values = [50, 200, 500]
+pa_values = [0.1, 0.25, 0.6]
+alpha_values = [0.5, 1.0, 2.0]
+lambda_values = [1.0, 1.5, 2.0]
+
 # Ejecutar Cuckoo Search con matriz compartida
 resultados = []
 tamaños = [10, 20, 50, 100, 200, 500]
 
-for n in tamaños:
-    tsp = matrices[n]
-    start = time.time()
-    ruta, dist_total = cuckoo_search_tsp(tsp, n_nests=25, max_iter=200)
-    duracion = time.time() - start
+with open("resultados_cuckoo.txt", "w", encoding="utf-8") as file:
+    for n in tamaños:
+        tsp = matrices[n]
+        for n_nests in n_nests_values:
+            for max_iter in max_iter_values:
+                for pa in pa_values:
+                    for alpha in alpha_values:
+                        for Lambda in lambda_values:
+                            start = time.time()
+                            ruta, dist_total = cuckoo_search_tsp(tsp, n_nests=n_nests, max_iter=max_iter, pa=pa, alpha=alpha, Lambda=Lambda)
+                            duracion = time.time() - start
 
-    print(f"[Cuckoo Search] n={n} | Tiempo: {duracion:.4f}s | Distancia: {dist_total}")
+                            encabezado = f"Cuckoo | nests={n_nests}, iter={max_iter}, pa={pa}, alpha={alpha}, lambda={Lambda}"
+                            resultado_str = f"[Cuckoo Search] n={n} | {encabezado} | Tiempo: {duracion:.4f}s | Distancia: {dist_total}"
+                            print(resultado_str)
+                            file.write(resultado_str + "\n")
 
-    resultados.append({
-        "Algoritmo": "Cuckoo Search",
-        "n": n,
-        "Ruta": ruta,
-        "Distancia": dist_total,
-        "Tiempo (s)": duracion,
-        "Temp Inicial": "-",
-        "Cooling Rate": "-",
-        "T_min": "-"
-    })
-
-    graficar_ruta_grafo_espacial(ruta, "Cuckoo Search", n, dist_total)
+                            resultados.append({
+                                "Algoritmo": encabezado,
+                                "n": n,
+                                "Ruta": ruta,
+                                "Distancia": dist_total,
+                                "Tiempo (s)": duracion,
+                                "n_nests": n_nests,
+                                "max_iter": max_iter,
+                                "pa": pa,
+                                "alpha": alpha,
+                                "lambda": Lambda
+                            })
 
 # Crear DataFrame con resultados
 df_cuckoo = pd.DataFrame(resultados)
-graficar_comparaciones(df_cuckoo, "Distancia")
-graficar_comparaciones(df_cuckoo, "Tiempo (s)")
+
+mejores_globales = df_cuckoo.sort_values(by="Distancia").head()
+mejores_por_n = df_cuckoo.loc[df_cuckoo.groupby("n")["Distancia"].idxmin()]
 
 print("\n🟢 Mejores rutas encontradas (menor distancia):")
-print(df_cuckoo.sort_values(by="Distancia").head())
+print(mejores_globales)
 
 print("\n📊 Mejor resultado por cada tamaño:")
-mejores_por_n = df_cuckoo.loc[df_cuckoo.groupby("n")["Distancia"].idxmin()]
-print(mejores_por_n[["n", "Distancia", "Tiempo (s)"]])
+print(mejores_por_n[["n", "Distancia", "Tiempo (s)", "n_nests", "max_iter", "pa", "alpha", "lambda"]])
+
+with open("resultados_cuckoo.txt", "a", encoding="utf-8") as file:
+    file.write("\n🟢 Mejores rutas encontradas (menor distancia):\n")
+    file.write(mejores_globales.to_string(index=False) + "\n")
+    file.write("\n📊 Mejor resultado por cada tamaño:\n")
+    file.write(mejores_por_n[["n", "Distancia", "Tiempo (s)", "n_nests", "max_iter", "pa", "alpha", "lambda"]].to_string(index=False) + "\n")
+
+# Crear carpeta para guardar imágenes
+carpeta = "mejores_rutas_cuckoo"
+os.makedirs(carpeta, exist_ok=True)
+
+# Graficar y guardar solo las mejores rutas por tamaño
+for _, fila in mejores_por_n.iterrows():
+    nombre_archivo = os.path.join(carpeta, f"cuckoo_n{fila['n']}.png")
+    graficar_ruta_grafo_espacial(
+        fila["Ruta"],
+        fila["Algoritmo"],
+        fila["n"],
+        fila["Distancia"],
+        save_path=nombre_archivo,
+        seed=int(fila["n"] + 2000)
+    )

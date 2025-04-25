@@ -27,8 +27,12 @@ def get_neighbors(sol):
             vecinos.append(vecino)
     return vecinos
 
-def graficar_ruta_grafo_espacial(ruta, algoritmo, n, distancia):
-    np.random.seed(42)
+def graficar_ruta_grafo_espacial(ruta, algoritmo, n, distancia, save_path=None, seed=None):
+    if seed is not None:
+        np.random.seed(seed)
+    else:
+        np.random.seed(42)  # Valor por defecto si no se pasa seed
+
     posiciones = {i: (np.random.rand(), np.random.rand()) for i in ruta}
 
     plt.figure(figsize=(10, 8))
@@ -45,11 +49,21 @@ def graficar_ruta_grafo_espacial(ruta, algoritmo, n, distancia):
     plt.title(f"Ruta en grafo espacial | {algoritmo} | n={n} | Distancia: {distancia}")
     plt.axis('off')
     plt.tight_layout()
-    plt.show()
+
+    if save_path:
+        plt.savefig(save_path)
+        plt.close()
+    else:
+        plt.show()
+
 
 def graficar_comparaciones(df, tipo="Distancia"):
     plt.figure(figsize=(12, 6))
-    sns.lineplot(data=df, x="n", y=tipo, hue="Algoritmo", marker="o", style="Temp Inicial")
+    if "Temp Inicial" in df.columns and df["Temp Inicial"].nunique() > 1:
+        sns.lineplot(data=df, x="n", y=tipo, hue="Temp Inicial", style="Algoritmo", marker="o")
+    else:
+        sns.lineplot(data=df, x="n", y=tipo, hue="Algoritmo", marker="o")
+
     plt.title(f"Comparación de {tipo.lower()} por algoritmo")
     plt.xlabel("Número de ciudades (n)")
     plt.ylabel(tipo)
